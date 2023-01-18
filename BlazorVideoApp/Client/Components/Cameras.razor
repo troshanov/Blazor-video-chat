@@ -1,0 +1,66 @@
+﻿@using BlazorVideoApp.Client.Interop;
+@using BlazorVideoApp.Shared;
+@using Microsoft.AspNetCore.Components;
+@using Microsoft.JSInterop;
+@using System.Threading.Tasks;
+
+<h5><i class="fas fa-cog"></i> Settings</h5>
+<div class="dropdown pb-4">
+    <button class="btn btn-lg btn-secondary dropdown-toggle twilio-btn-red w-100"
+            type="button" id="dropdownMenuButton"
+            data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+        <span>@(IsLoading ? "Loading cameras..." : "Select Camera")</span>
+        @if (IsLoading)
+        {
+            <span id="loading" class="spinner-border spinner-border-sm"
+              role="status" aria-hidden="true"></span>
+        }
+    </button>
+    <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+        @if (HasDevices)
+        {
+            foreach (var device in Devices!)
+            {
+                <a href="#" class="dropdown-item @(_activeCamera == device.DeviceId ? "active" : "")"
+           id="@device.DeviceId"
+           @onclick="@(async () => await SelectCamera(device.DeviceId))">
+                    @device.Label
+                </a>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [Inject]
+    protected IJSRuntime? JavaScript { get; set; }
+
+    [Parameter]
+    public EventCallback<string> CameraChanged { get; set; }
+
+    protected Device[]? Devices { get; private set; }
+    protected CameraState State { get; private set; }
+    protected bool HasDevices => State == CameraState.FoundCameras;
+    protected bool IsLoading => State == CameraState.LoadingCameras;
+
+    string? _activeCamera;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Devices = await JavaScript.GetVideoDevicesAsync();
+        State = Devices != null && Devices.Length > 0
+                ? CameraState.FoundCameras
+                : CameraState.Error;
+    }
+
+    protected async ValueTask SelectCamera(string deviceId)
+    {
+        await JavaScript.StartVideoAsync(deviceId, "#camera");
+        _activeCamera = deviceId;
+
+        if (CameraChanged.HasDelegate)
+        {
+            await CameraChanged.InvokeAsync(_activeCamera);
+        }
+    }
+}
